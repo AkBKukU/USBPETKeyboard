@@ -66,7 +66,7 @@ const uint8_t DEBOUNCE_DELAY = 2;
 int8_t usbKeys[6] = {-1,-1,-1,-1,-1,-1};
 uint8_t keysUsed = 0;
 
-bool lShift = 0, rShift = 0, ctrl = 0;
+bool lShift = 0, rShift = 0, ctrl = 0, lArrow = 0, rArrow = 0;
 
 int modifiers = 0;
 bool keyStateChange = false;
@@ -87,8 +87,10 @@ void setup()
 	}
 
 	// Initilize Serial to relay button presses
+	/*
 	Serial.begin(9600);
 	Serial.println("Setup Complete");
+	*/
 }
 
 void loop() 
@@ -97,9 +99,14 @@ void loop()
 	
 	if(keyStateChange)
 	{
+		if (!(lArrow || rArrow) && (lShift || rShift))
+		{
+			modifiers = modifiers | MODIFIERKEY_SHIFT;
+		}
 		keyStateChange = false;
 		Keyboard.set_modifier(modifiers);
 		Keyboard.send_now();
+		modifiers = modifiers & ~MODIFIERKEY_SHIFT;
 	}
 	//printKeyPosition();
 }
@@ -119,7 +126,7 @@ void detectKeys()
 			{
 				if( digitalRead(SENSE_PINS[j]) == LOW)
 				{
-					setKey(keyId);
+					setKey(keyId,0);
 				}else{
 					checkRelease(keyId);
 				}
@@ -185,10 +192,38 @@ bool parseSpecial(uint8_t keyId, bool state)
 	switch(keyId)
 	{
 		case 64:
-			lShift = state;
+			if (state == LOW && lShift == false) 
+			{
+				if( debounce(keyId) )	return true;
+				lShift = true;
+				keyStateChange = true;
+			}
+			
+			if (state == HIGH && lShift == true) 
+			{
+				if( debounce(keyId) )	return true;
+				lShift = false;
+				keyStateChange = true;
+			}
+
+			isSpecial=true;
 			break;
 		case 69:
-			rShift = state;
+			if (state == LOW && rShift == false) 
+			{
+				if( debounce(keyId) )	return true;
+				rShift = true;
+				keyStateChange = true;
+			}
+			
+			if (state == HIGH && rShift == true) 
+			{
+				if( debounce(keyId) )	return true;
+				rShift = false;
+				keyStateChange = true;
+			}
+
+			isSpecial=true;
 			break;
 		case 72:
 			if ( state == LOW )
@@ -205,10 +240,41 @@ bool parseSpecial(uint8_t keyId, bool state)
 			}
 			isSpecial=true;
 			break;
-		case 76:
-			// RUN STOP key.
-			break;
+		case 7: // Horizontal CRSR
 			
+			if(state == LOW)
+			{
+				if (lShift || rShift)
+				{
+					setKey(keyId,KEY_LEFT);
+				}else{
+					setKey(keyId,KEY_RIGHT);
+				}
+				rArrow = true;
+			}else{
+				checkRelease(keyId);			
+				rArrow = false;
+			}
+			isSpecial=true;
+			break;
+		case 14: // Vertical CRSR
+			if(state == LOW)
+			{
+				if (lShift || rShift)
+				{
+					setKey(keyId,KEY_UP);
+				}else{
+					setKey(keyId,KEY_DOWN);
+				}
+
+				lArrow = true;
+			}else{
+				checkRelease(keyId);			
+				lArrow = false;
+			}
+			
+
+			isSpecial=true;
 			break;
 	}
 
@@ -250,7 +316,7 @@ bool debounce(uint8_t keyId)
 		}	
 	}
 }
-bool setKey(uint8_t keyId)
+bool setKey(uint8_t keyId, uint16_t keyCode )
 {
 	// Make sure all keys are in use
 	if(keysUsed == 6) return false;
@@ -278,8 +344,6 @@ bool setKey(uint8_t keyId)
 			break;
 		}
 	}
-				Serial.print("Free keys: ");
-				Serial.println(keysUsed);
 
 	if(keySet)
 	{
@@ -288,25 +352,30 @@ bool setKey(uint8_t keyId)
 			modifiers = modifiers | MODIFIERKEY_SHIFT;
 		}
 		keyStateChange = true;
+		uint16_t keyToSet = KEY_CODES[keyId];
+		if ( keyCode )
+		{
+			keyToSet = keyCode;
+		}
 		switch(keyNum+1)
 		{
 			case 1:
-				Keyboard.set_key1(KEY_CODES[keyId]);
+				Keyboard.set_key1(keyToSet);
 				break;
 			case 2:
-				Keyboard.set_key2(KEY_CODES[keyId]);
+				Keyboard.set_key2(keyToSet);
 				break;
 			case 3:
-				Keyboard.set_key3(KEY_CODES[keyId]);
+				Keyboard.set_key3(keyToSet);
 				break;
 			case 4:
-				Keyboard.set_key4(KEY_CODES[keyId]);
+				Keyboard.set_key4(keyToSet);
 				break;
 			case 5:
-				Keyboard.set_key5(KEY_CODES[keyId]);
+				Keyboard.set_key5(keyToSet);
 				break;
 			case 6:
-				Keyboard.set_key6(KEY_CODES[keyId]);
+				Keyboard.set_key6(keyToSet);
 				break;
 		}
 	}
@@ -363,7 +432,9 @@ void printKeyPosition()
 					out = 'H';
 					break;
 				}
-				Serial.println(out);
+				Serial.print(out);
+				Serial.print(" ,keyId: ");
+				Serial.println(getKeyId(i,j));
 			}
 		}
 		digitalWrite(DRIVE_PINS[i], HIGH);
