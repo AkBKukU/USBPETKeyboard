@@ -175,6 +175,7 @@ void detectKeys()
 			}
 		}
 
+		// Set pin HIGH to disable
 		digitalWrite(DRIVE_PINS[i], HIGH);
 	}
 }
@@ -236,13 +237,18 @@ void checkRelease(uint8_t keyId)
 	}
 }
 
+// handle keys that require special actions
+// TODO - breakout each key's logic into seperate functions.
 bool parseSpecial(uint8_t keyId, bool state)
 {
+	// return value that indicates a special key was handled
 	bool isSpecial = false;
 	
+	// the logic for each special key
 	switch(keyId)
 	{
-		case 64:
+		case 64: // Left shift
+			// Key pressed and not active
 			if (state == LOW && lShift == false) 
 			{
 				if( debounce(keyId) )	return true;
@@ -250,6 +256,7 @@ bool parseSpecial(uint8_t keyId, bool state)
 				keyStateChange = true;
 			}
 			
+			// Key released and active
 			if (state == HIGH && lShift == true) 
 			{
 				if( debounce(keyId) )	return true;
@@ -259,7 +266,9 @@ bool parseSpecial(uint8_t keyId, bool state)
 
 			isSpecial=true;
 			break;
-		case 69:
+
+		case 69: // Right shift
+			// Key pressed and not active
 			if (state == LOW && rShift == false) 
 			{
 				if( debounce(keyId) )	return true;
@@ -267,6 +276,7 @@ bool parseSpecial(uint8_t keyId, bool state)
 				keyStateChange = true;
 			}
 			
+			// Key released and active
 			if (state == HIGH && rShift == true) 
 			{
 				if( debounce(keyId) )	return true;
@@ -276,25 +286,31 @@ bool parseSpecial(uint8_t keyId, bool state)
 
 			isSpecial=true;
 			break;
-		case 72:
+
+		case 72: // RVS OFF | Control
+			// pressed
 			if ( state == LOW )
 			{
 				if( debounce(keyId) )	return true;
-			
+				// set control modifier 
 				modifiers = modifiers | MODIFIERKEY_CTRL;
 				keyStateChange = true;
+			// released
 			}else{
 				if( debounce(keyId) )	return true;
-
+				// mask remove control modifier 
 				modifiers = modifiers & ~MODIFIERKEY_CTRL;
 				keyStateChange = true;
 			}
+
 			isSpecial=true;
 			break;
+
 		case 7: // Horizontal CRSR
-			
+			// pressed
 			if(state == LOW)
 			{
+				// check for active shift to reverse direction
 				if (lShift || rShift)
 				{
 					setKey(keyId,KEY_LEFT);
@@ -309,8 +325,10 @@ bool parseSpecial(uint8_t keyId, bool state)
 			isSpecial=true;
 			break;
 		case 14: // Vertical CRSR
+			// pressed
 			if(state == LOW)
 			{
+				// check for active shift to reverse direction
 				if (lShift || rShift)
 				{
 					setKey(keyId,KEY_UP);
@@ -332,23 +350,28 @@ bool parseSpecial(uint8_t keyId, bool state)
 	return isSpecial;
 }
 
+// debounce the key input.
 bool debounce(uint8_t keyId)
 {
+	// for each of the 6 possible usb keys held go through each
 	for ( uint8_t i = 0; i < 6; i++ )
 	{
+		// keyid exists
 		if( debounceKeys[i][0] == keyId )
 		{
+			// key being debounced
 			if ( debounceKeys[i][1] != 1 )
 			{
 				debounceKeys[i][1]--;
 				return true;
 			}
+			// key has finished debounce
 			else if( debounceKeys[i][1] == 1 )
 			{
 				debounceKeys[i][1] = 0;
 				return false;
 			}
-
+			// reset key debounce
 			else if( debounceKeys[i][1] == 0 )
 			{
 				debounceKeys[i][1] = DEBOUNCE_DELAY;
@@ -357,6 +380,7 @@ bool debounce(uint8_t keyId)
 		}
 	}
 
+	// set new key to debounce
 	for ( uint8_t i = 0; i < 6; i++ )
 	{
 		if( debounceKeys[i][1] == 0 )
@@ -367,16 +391,18 @@ bool debounce(uint8_t keyId)
 		}	
 	}
 }
+
+// set key as pressed
 bool setKey(uint8_t keyId, uint16_t keyCode )
 {
-	// Make sure all keys are in use
+	// check if all keys are in use
 	if(keysUsed == 6) return false;
 
 	if( debounce(keyId) )	return false;
+
 	bool keySet = false;
-	
 	uint8_t keyNum = 0;
-	
+	// check if key is already set
 	for( keyNum = 0; keyNum < 6 ; keyNum++)
 	{
 		if(usbKeys[keyNum] == keyId)
@@ -385,6 +411,7 @@ bool setKey(uint8_t keyId, uint16_t keyCode )
 		}
 	}
 	
+	// find free usb key and set it
 	for( keyNum = 0; keyNum < 6 ; keyNum++)
 	{
 		if(usbKeys[keyNum] == -1)
@@ -395,19 +422,23 @@ bool setKey(uint8_t keyId, uint16_t keyCode )
 			break;
 		}
 	}
-
+	
+	// key was set
 	if(keySet)
 	{
+		// if the key needs shift to print the character set it
 		if(KEY_CODES_SHIFT_NEEDED[keyId])
 		{
 			modifiers = modifiers | MODIFIERKEY_SHIFT;
 		}
 		keyStateChange = true;
+		// get teensy key code for key
 		uint16_t keyToSet = KEY_CODES[keyId];
 		if ( keyCode )
 		{
 			keyToSet = keyCode;
 		}
+		// set free usb key to key pressed
 		switch(keyNum+1)
 		{
 			case 1:
@@ -434,11 +465,14 @@ bool setKey(uint8_t keyId, uint16_t keyCode )
 	return keySet;
 }
 
+// get the id from the row and column
+// TODO - probably safe to always inline this or convert it to a macro
 uint8_t getKeyId(uint8_t i, uint8_t j)
 {
-	return (i*8) + (j);
+	return (i*SENSE_COUNT) + (j);
 }
 
+// debug to plot the matrix
 void printKeyPosition()
 {
 	// Check all sense pins on each drive pin for a low signal
