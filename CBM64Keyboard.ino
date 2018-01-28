@@ -27,7 +27,7 @@
 // 5/ 7 <--> 15/C5
 // 6/ 6 <--> 16/C6
 // 7/ 5 <--> 17/C7
-// 8/ 3 <-->  9/E6
+// 8/ 3 <-->  9/E1
 //
 // Please refer to matrix and pin layouts as described in 
 // https://www.waitingforfriday.com/?p=470 (for CBM 64) and
